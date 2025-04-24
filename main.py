@@ -75,6 +75,7 @@ os_type = os.name
 clear_command = "cls" if os_type == 'nt' else "clear"
 color_obj = utils.Color()
 os.environ['PATH'] = ffmpeg_path + os.pathsep + current_env_path
+max_size_gb = 5
 
 
 def signal_handler(_signal, _frame):
@@ -83,6 +84,35 @@ def signal_handler(_signal, _frame):
 
 signal.signal(signal.SIGTERM, signal_handler)
 
+def check_disk_space(path: str, threshold_gb: float) -> bool:
+    """
+    检查存储空间是否低于阈值。
+    Args:
+        path (str): 要检查的路径。
+        threshold_gb (float): 存储空间阈值（GB）。
+    Returns:
+        bool: 如果低于阈值，则返回 True。
+    """
+    total, used, free = shutil.disk_usage(path)
+    free_gb = free / (1024 ** 3)  # 将字节转换为 GB
+    return free_gb < threshold_gb
+
+def delete_oldest_file(directory: str) -> None:
+    """
+    删除目录中最早修改的文件。
+    Args:
+        directory (str): 要清理的目录。
+    """
+    try:
+        files = [os.path.join(directory, f) for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]
+        if not files:
+            print(f"警告: 目录 {directory} 中没有文件可以删除！")
+            return
+        oldest_file = min(files, key=os.path.getctime)  # 找到最早修改的文件
+        print(f"删除历史最早文件: {oldest_file}")
+        os.remove(oldest_file)
+    except Exception as e:
+        logger.error(f"删除文件失败: {e}")
 
 def display_info() -> None:
     global start_display_time
@@ -1282,6 +1312,10 @@ def start_record(url_data: tuple, count_variable: int = -1) -> None:
                                                 save_file_path,
                                             ]
 
+                                        while check_disk_space(full_path, max_size_gb):
+                                                print(f"存储空间低于 {max_size_gb} GB，正在清理历史文件...")
+                                                delete_oldest_file(full_path)
+
                                         ffmpeg_command.extend(command)
                                         comment_end = check_subprocess(
                                             record_name,
@@ -1387,6 +1421,10 @@ def start_record(url_data: tuple, count_variable: int = -1) -> None:
                                                 "-reset_timestamps", "1",
                                                 save_file_path,
                                             ]
+
+                                            while check_disk_space(full_path, max_size_gb):
+                                                print(f"存储空间低于 {max_size_gb} GB，正在清理历史文件...")
+                                                delete_oldest_file(full_path)
 
                                             ffmpeg_command.extend(command)
                                             comment_end = check_subprocess(
