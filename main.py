@@ -1,11 +1,8 @@
 # -*- encoding: utf-8 -*-
 
 """
-Author: Hmily
-GitHub: https://github.com/ihmily
-Date: 2023-07-17 23:52:05
-Update: 2025-02-08 19:19:00
-Copyright (c) 2023-2025 by Hmily, All Rights Reserved.
+Author: Kylin Kaze
+
 Function: Record live stream video.
 """
 import asyncio
@@ -38,7 +35,7 @@ from ffmpeg_install import (
     check_ffmpeg, ffmpeg_path, current_env_path
 )
 
-version = "v4.0.3"
+version = "v4.0.4"
 platforms = ("\n国内站点：抖音|快手|虎牙|斗鱼|YY|B站|小红书|bigo|blued|网易CC|千度热播|猫耳FM|Look|TwitCasting|百度|微博|"
              "酷狗|花椒|流星|Acfun|畅聊|映客|音播|知乎|嗨秀|VV星球|17Live|浪Live|漂漂|六间房|乐嗨|花猫|淘宝|京东"
              "\n海外站点：TikTok|SOOP|PandaTV|WinkTV|FlexTV|PopkonTV|TwitchTV|LiveMe|ShowRoom|CHZZK|Shopee|"
@@ -223,11 +220,12 @@ def converts_mp4(converts_file_path: str, is_original_delete: bool = True) -> No
                 color_obj.print_colored(f"正在转码为MP4格式并重新编码为h264\n", color_obj.YELLOW)
                 ffmpeg_command = [
                     "ffmpeg", "-i", converts_file_path,
-                    "-c:v", "libx264",
-                    "-preset", "veryfast",
+                    "-c:v", "libx265",
+                    "-preset", "medium",
                     "-crf", "23",
                     "-vf", "format=yuv420p",
-                    "-c:a", "copy",
+                    "-c:a", "aac",
+                    "-b:a", "128k",
                     "-f", "mp4", converts_file_path.rsplit('.', maxsplit=1)[0] + ".mp4",
                 ]
             else:
@@ -380,6 +378,12 @@ def clear_record_info(record_name: str, record_url: str) -> None:
         monitoring -= 1
         color_obj.print_colored(f"[{record_name}]已经从录制列表中移除\n", color_obj.YELLOW)
 
+def check_file_size(file_path: str, max_size_mb: int) -> bool:
+    if os.path.exists(file_path):
+        file_size_mb = os.path.getsize(file_path) / (1024 * 1024)
+        if file_size_mb > max_size_mb:
+            return True
+    return False
 
 def check_subprocess(record_name: str, record_url: str, ffmpeg_command: list, save_type: str,
                      script_command: str | None = None) -> bool:
@@ -411,6 +415,11 @@ def check_subprocess(record_name: str, record_url: str, ffmpeg_command: list, sa
             process.wait()
             return True
         time.sleep(1)
+
+    max_file_size_mb = 500 
+    if check_file_size(save_file_path, max_file_size_mb):
+        print(f"警告: 录制文件 {save_file_path} 超过 {max_file_size_mb} MB，正在覆盖旧文件...")
+        os.remove(save_file_path)
 
     return_code = process.returncode
     stop_time = time.strftime('%Y-%m-%d %H:%M:%S')
